@@ -34,7 +34,7 @@ GROUP BY 1,2,3,4
 ORDER BY 5 DESC;
 
 
-/* Q2: We want to find out the most popular music Genre for each country. We determine the most popular genre as the genre 
+/* Q3: We want to find out the most popular music Genre for each country. We determine the most popular genre as the genre 
 with the highest amount of purchases. Write a query that returns each country along with the top Genre. For countries where 
 the maximum number of purchases is shared return all Genres. */
 
@@ -42,19 +42,19 @@ the maximum number of purchases is shared return all Genres. */
 
 /* Method 1: Using CTE */
 
-WITH popular_genre AS 
-(
-    SELECT COUNT(invoice_line.quantity) AS purchases, customer.country, genre.name, genre.genre_id, 
-	ROW_NUMBER() OVER(PARTITION BY customer.country ORDER BY COUNT(invoice_line.quantity) DESC) AS RowNo 
-    FROM invoice_line 
-	JOIN invoice ON invoice.invoice_id = invoice_line.invoice_id
-	JOIN customer ON customer.customer_id = invoice.customer_id
-	JOIN track ON track.track_id = invoice_line.track_id
-	JOIN genre ON genre.genre_id = track.genre_id
-	GROUP BY 2,3,4
-	ORDER BY 2 ASC, 1 DESC
+with genreRanked as (
+	select c.country , g.name , COUNT(il.quantity) AS purchase, 
+	row_number() over (partition by c.country order by count(il.quantity) desc) as genre_rank
+	from customer c
+	join invoice iv on c.customer_id = iv.customer_id
+	join invoice_line il on iv.invoice_id = il.invoice_id
+	join track t on t.track_id = il.track_id
+	join genre g on g.genre_id = t.genre_id
+	group by 1, 2
+	order by  1 asc 
 )
-SELECT * FROM popular_genre WHERE RowNo <= 1
+select * from genreRanked
+where genre_rank = 1;
 
 
 /* Method 2: : Using Recursive */
@@ -90,14 +90,16 @@ first find the most spent on music for each country and second filter the data f
 
 /* Method 1: using CTE */
 
-WITH Customter_with_country AS (
-		SELECT customer.customer_id,first_name,last_name,billing_country,SUM(total) AS total_spending,
-	    ROW_NUMBER() OVER(PARTITION BY billing_country ORDER BY SUM(total) DESC) AS RowNo 
-		FROM invoice
-		JOIN customer ON customer.customer_id = invoice.customer_id
-		GROUP BY 1,2,3,4
-		ORDER BY 4 ASC,5 DESC)
-SELECT * FROM Customter_with_country WHERE RowNo <= 1
+with customerRanked as (
+	select c.customer_id, c.first_name ,c.last_name, c.country ,  sum(il.quantity * il.unit_price) AS total_spending, 
+	row_number() over (partition by c.country order by sum(il.quantity * il.unit_price) desc) as cust_rank
+	from customer c
+	join invoice iv on c.customer_id = iv.customer_id
+	join invoice_line il on iv.invoice_id = il.invoice_id
+	group by 1 , 2,3,4
+	order by 4 ASC,5 DESC) -- if same c.country name will be there so then 5 desc will work..
+select * from customerRanked
+where cust_rank = 1;
 
 
 /* Method 2: Using Recursive */
